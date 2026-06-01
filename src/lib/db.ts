@@ -19,11 +19,9 @@ const toDate = (val: unknown): Date =>
 const mapComponent = (id: string, data: Record<string, unknown>): Component => ({
   id,
   name: data.name as string,
-  branch: data.branch as string,
-  ticket: data.ticket as string,
-  devStatus: data.devStatus as Component['devStatus'],
-  masterStatus: data.masterStatus as Component['masterStatus'],
-  prodStatus: data.prodStatus as Component['prodStatus'],
+  gitlabProjectId: data.gitlabProjectId as number | undefined,
+  gitlabProjectName: data.gitlabProjectName as string | undefined,
+  gitlabProjectPath: data.gitlabProjectPath as string | undefined,
   lastTicketProd: data.lastTicketProd as string | undefined,
   comments: data.comments as string | undefined,
   createdAt: toDate(data.createdAt),
@@ -61,6 +59,9 @@ export const updateComponent = async (id: string, data: Partial<Component>): Pro
 
 export const deleteComponent = async (id: string): Promise<void> => {
   await deleteDoc(doc(db, 'components', id))
+  // Borrar releases huérfanas del componente
+  const snap = await getDocs(query(collection(db, 'releases'), where('componentId', '==', id)))
+  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)))
 }
 
 // Releases

@@ -1,36 +1,36 @@
 @import "tailwindcss";
 
-@keyframes cursor-move {
-  0%   { left: 18%; opacity: 0; }
-  8%   { left: 18%; opacity: 1; }
-  28%  { left: 18%; opacity: 1; }
-  36%  { left: 50%; opacity: 1; }
-  56%  { left: 50%; opacity: 1; }
-  64%  { left: 80%; opacity: 1; }
-  84%  { left: 80%; opacity: 1; }
-  92%  { left: 80%; opacity: 0; }
-  100% { left: 18%; opacity: 0; }
-}
-
-.animate-cursor-move {
-  animation: cursor-move 2.4s ease-in-out infinite;
+@keyframes cursor-steps {
+  0%   { left: 29%; opacity: 0; }
+  6%   { left: 29%; opacity: 1; }
+  28%  { left: 29%; opacity: 1; }
+  38%  { left: 50%; opacity: 1; }
+  60%  { left: 50%; opacity: 1; }
+  70%  { left: 71%; opacity: 1; }
+  90%  { left: 71%; opacity: 1; }
+  96%  { left: 71%; opacity: 0; }
+  100% { left: 29%; opacity: 0; }
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --latam-red: #E31837;
+  --latam-red-dark: #C01530;
+  --latam-red-light: #FDECEA;
+  --latam-navy: #1B2A4A;
+  --latam-navy-dark: #111D33;
+  --latam-navy-light: #E8EBF2;
+  --latam-bg: #F5F6FA;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--latam-bg);
+  --color-foreground: var(--latam-navy);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--latam-bg);
+  color: var(--latam-navy);
+  font-family: var(--font-inter), Inter, Arial, sans-serif;
 }

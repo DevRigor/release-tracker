@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Component, EnvStatus } from '@/lib/types'
-import { updateComponent, deleteComponent } from '@/lib/db'
+import { Component } from '@/lib/types'
+import { deleteComponent } from '@/lib/db'
 import PipelineStatus from './PipelineStatus'
 import PipelineTooltip from './PipelineTooltip'
 import ProdModal from './ProdModal'
@@ -12,10 +12,26 @@ interface Props {
   onRefresh: () => void
 }
 
-const nextStatus: Record<EnvStatus, EnvStatus> = {
-  pending: 'in-progress',
-  'in-progress': 'done',
-  done: 'pending',
+const GROUP_PREFIX = 'latamairlines/oper/flight-operation-safety-and-security/aircraft-operations/'
+
+function SubgroupBadges({ path }: { path?: string }) {
+  if (!path) return null
+  const rel = path.startsWith(GROUP_PREFIX) ? path.slice(GROUP_PREFIX.length) : path
+  const parts = rel.split('/')
+  const subgroups = parts.slice(0, -1)
+  if (subgroups.length === 0) return null
+  return (
+    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+      {subgroups.map((part, i) => (
+        <span key={i} className="flex items-center gap-1">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: '#E8EBF2', color: '#1B2A4A' }}>
+            {part}
+          </span>
+          {i < subgroups.length - 1 && <span className="text-slate-300 text-[10px]">›</span>}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 export default function ComponentsTable({ components, onRefresh }: Props) {
@@ -23,19 +39,9 @@ export default function ComponentsTable({ components, onRefresh }: Props) {
   const [prodTarget, setProdTarget] = useState<Component | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const filtered = components.filter(c => {
-    const q = search.toLowerCase()
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.branch.toLowerCase().includes(q) ||
-      c.ticket.toLowerCase().includes(q)
-    )
-  })
-
-  const cycleStatus = async (component: Component, field: 'devStatus' | 'masterStatus') => {
-    await updateComponent(component.id, { [field]: nextStatus[component[field]] })
-    onRefresh()
-  }
+  const filtered = components.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  )
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este componente?')) return
@@ -58,8 +64,8 @@ export default function ComponentsTable({ components, onRefresh }: Props) {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, rama o ticket..."
-          className="w-full border border-slate-200 rounded-lg pl-9 pr-9 py-2.5 text-sm text-slate-800 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+          placeholder="Buscar componente..."
+          className="w-full border border-slate-200 rounded-lg pl-9 pr-9 py-2.5 text-sm text-slate-800 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-300 shadow-sm"
         />
         {search && (
           <button
@@ -75,58 +81,54 @@ export default function ComponentsTable({ components, onRefresh }: Props) {
       {components.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="text-5xl mb-4">📦</div>
-          <h3 className="text-lg font-semibold text-slate-700 mb-1">No hay componentes todavía</h3>
+          <h3 className="text-lg font-semibold text-white text-xs uppercase tracking-wider mb-1">No hay componentes todavía</h3>
           <p className="text-sm text-slate-400">Añade tu primer componente con el botón de arriba.</p>
         </div>
       )}
 
       {/* Tabla */}
       {components.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Componente</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Rama</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Ticket</th>
-                <th className="text-center px-4 py-3 font-semibold text-slate-600">
+              <tr style={{ background: 'var(--latam-navy)', borderBottom: '1px solid var(--latam-navy-dark)' }}>
+                <th className="text-left px-4 py-3 font-semibold text-white text-xs uppercase tracking-wider">Componente</th>
+                <th className="text-center px-4 py-3 font-semibold text-white text-xs uppercase tracking-wider">
                   <span className="inline-flex items-center gap-1">
-                    Pipeline
+                    Pipeline GitLab
                     <PipelineTooltip />
                   </span>
                 </th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Último ticket prod</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Comentarios</th>
-                <th className="text-center px-4 py-3 font-semibold text-slate-600">Acciones</th>
+                <th className="text-left px-4 py-3 font-semibold text-white text-xs uppercase tracking-wider">Último ticket prod</th>
+                <th className="text-left px-4 py-3 font-semibold text-white text-xs uppercase tracking-wider">Comentarios</th>
+                <th className="text-center px-4 py-3 font-semibold text-white text-xs uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-slate-400 text-sm">
+                  <td colSpan={5} className="text-center py-10 text-slate-400 text-sm">
                     Sin resultados para &quot;{search}&quot;
                   </td>
                 </tr>
               ) : (
                 filtered.map(c => (
                   <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-slate-800">{c.name}</td>
-                    <td className="px-4 py-3 text-slate-500 font-mono text-xs">{c.branch}</td>
                     <td className="px-4 py-3">
-                      <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-mono font-semibold">
-                        {c.ticket}
-                      </span>
+                      <span className="font-medium text-slate-800 text-sm">{c.name}</span>
+                      <SubgroupBadges path={c.gitlabProjectPath} />
                     </td>
                     <td className="px-4 py-4 text-center">
                       <div className="flex justify-center">
-                        <PipelineStatus
-                          devStatus={c.devStatus}
-                          masterStatus={c.masterStatus}
-                          prodStatus={c.prodStatus}
-                          onDevClick={() => cycleStatus(c, 'devStatus')}
-                          onMasterClick={() => cycleStatus(c, 'masterStatus')}
-                          onProdClick={() => c.prodStatus !== 'done' && setProdTarget(c)}
-                        />
+                        {c.gitlabProjectId ? (
+                          <PipelineStatus
+                            projectId={c.gitlabProjectId}
+                            lastTicketProd={c.lastTicketProd}
+                            onProdClick={() => setProdTarget(c)}
+                          />
+                        ) : (
+                          <span className="text-xs text-slate-400">Sin proyecto GitLab</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
