@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@keyframes cursor-move {
+  0%   { left: 18%; opacity: 0; }
+  8%   { left: 18%; opacity: 1; }
+  28%  { left: 18%; opacity: 1; }
+  36%  { left: 50%; opacity: 1; }
+  56%  { left: 50%; opacity: 1; }
+  64%  { left: 80%; opacity: 1; }
+  84%  { left: 80%; opacity: 1; }
+  92%  { left: 80%; opacity: 0; }
+  100% { left: 18%; opacity: 0; }
+}
+
+.animate-cursor-move {
+  animation: cursor-move 2.4s ease-in-out infinite;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
