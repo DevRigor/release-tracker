@@ -5,7 +5,11 @@ import { useEffect, useState } from 'react'
 interface StepStatus {
   status: string | null
   webUrl: string | null
+  sha: string | null
+  deployedAt: string | null
 }
+
+const EMPTY_STEP: StepStatus = { status: null, webUrl: null, sha: null, deployedAt: null }
 
 const statusStyle: Record<string, { bg: string; border: string; text: string; icon: string }> = {
   success:  { bg: 'bg-emerald-500', border: 'border-emerald-500', text: 'text-white',     icon: '✓' },
@@ -77,18 +81,18 @@ interface Props {
 }
 
 export default function PipelineStatus({ projectId, lastTicketProd, onProdClick }: Props) {
-  const [dev, setDev] = useState<StepStatus>({ status: null, webUrl: null })
-  const [master, setMaster] = useState<StepStatus>({ status: null, webUrl: null })
-  const [prod, setProd] = useState<StepStatus>({ status: null, webUrl: null })
+  const [dev, setDev] = useState<StepStatus>(EMPTY_STEP)
+  const [master, setMaster] = useState<StepStatus>(EMPTY_STEP)
+  const [prod, setProd] = useState<StepStatus>(EMPTY_STEP)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch(`/api/gitlab/statuses?projectId=${projectId}`)
       .then(r => r.json())
       .then(data => {
-        setDev(data.dev ?? { status: null, webUrl: null })
-        setMaster(data.master ?? { status: null, webUrl: null })
-        setProd(data.prod ?? { status: null, webUrl: null })
+        setDev(data.dev ?? EMPTY_STEP)
+        setMaster(data.master ?? EMPTY_STEP)
+        setProd(data.prod ?? EMPTY_STEP)
       })
       .finally(() => setLoading(false))
   }, [projectId])
@@ -109,45 +113,73 @@ export default function PipelineStatus({ projectId, lastTicketProd, onProdClick 
     )
   }
 
+  // "En prod" = el código de master/intg está realmente en prod (mismo SHA).
+  // Un deploy a prod exitoso pero de una versión anterior (master adelante) NO es estar en prod.
+  const prodDeploySuccess = prod.status === 'success'
+  const prodFailed = prod.status === 'failed'
+  const prodRunning = prod.status === 'running' || prod.status === 'pending'
+
+  const sameSha = !!prod.sha && !!master.sha && prod.sha === master.sha
+  // Si no hay deploy a intg para comparar, caemos a "el último deploy a prod fue exitoso".
+  const prodReached = prodDeploySuccess && (master.sha ? sameSha : true)
+  // Hay una versión vieja en prod, pero master tiene cambios sin liberar (en QA).
+  const prodBehind = prodDeploySuccess && !!master.sha && !sameSha
+
+  const prodDocumented = prodReached && !!lastTicketProd
+  const prodInProd = prodReached || (!!lastTicketProd && !prodBehind)  // círculo verde
+  const prodNeedsDoc = prodReached && !lastTicketProd                  // en prod pero falta el ticket
+  // Clickable solo para documentar (en prod sin ticket) o registrar (nunca llegó a prod).
+  const prodClickable = prodNeedsDoc || (!prodInProd && !prodBehind && !prodFailed && !prodRunning)
+
+  const prodDeployedLabel = prod.deployedAt
+    ? ` (del ${new Date(prod.deployedAt).toLocaleDateString('es-CL')})`
+    : ''
+
   return (
     <div className="flex items-center">
       <GitlabCircle label="dev" step={dev} />
       <Connector active={dev.status === 'success'} />
       <GitlabCircle label="master" step={master} />
-      <Connector active={prod.status === 'success' || !!lastTicketProd} />
+      <Connector active={prodInProd} />
       <div className="flex flex-col items-center gap-1 relative">
         <button
-          onClick={!lastTicketProd ? onProdClick : undefined}
-          disabled={!!lastTicketProd}
+          onClick={prodClickable ? onProdClick : undefined}
+          disabled={!prodClickable}
           title={
-            lastTicketProd
+            prodDocumented
               ? `En prod: ${lastTicketProd}`
-              : prod.status === 'success'
+              : prodNeedsDoc
               ? '¡En prod! Click para documentar ticket y comentario'
+              : prodBehind
+              ? `Prod tiene una versión anterior${prodDeployedLabel}. Master tiene cambios sin liberar (en QA).`
+              : prodFailed
+              ? 'Deploy a prod falló'
+              : prodRunning
+              ? 'Deploy a prod en curso'
               : 'Registrar paso a producción'
           }
           className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all
-            ${lastTicketProd
-              ? 'bg-emerald-500 border-emerald-500 text-white cursor-default'
-              : prod.status === 'success'
-              ? 'bg-emerald-400 border-emerald-500 text-white animate-pulse hover:scale-110 cursor-pointer'
-              : prod.status === 'failed'
+            ${prodInProd
+              ? `bg-emerald-500 border-emerald-500 text-white ${prodNeedsDoc ? 'hover:scale-110 cursor-pointer' : 'cursor-default'}`
+              : prodBehind
+              ? 'bg-white border-amber-400 text-amber-500 cursor-default'
+              : prodFailed
               ? 'bg-red-500 border-red-500 text-white'
-              : prod.status === 'running'
+              : prodRunning
               ? 'bg-blue-500 border-blue-500 text-white animate-pulse'
               : 'bg-white border-slate-300 text-slate-400 hover:border-emerald-400 hover:text-emerald-400 cursor-pointer'
             }
           `}
         >
-          {lastTicketProd ? '✓'
-            : prod.status === 'success' ? '!'
-            : prod.status === 'failed' ? '✕'
-            : prod.status === 'running' ? '▶'
+          {prodInProd ? '✓'
+            : prodBehind ? '↑'
+            : prodFailed ? '✕'
+            : prodRunning ? '▶'
             : '○'}
         </button>
-        {/* Badge "falta documentar" */}
-        {prod.status === 'success' && !lastTicketProd && (
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border border-white" title="Falta documentar" />
+        {/* Badge "en prod, falta documentar el ticket" */}
+        {prodNeedsDoc && (
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border border-white" title="En prod — falta documentar el ticket" />
         )}
         <span className="text-[10px] font-medium text-slate-500 leading-none">prod</span>
       </div>

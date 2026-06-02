@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
 
-async function fetchAllProjects(token: string, groupPath: string) {
+interface RawProject {
+  id: number
+  name: string
+  path_with_namespace: string
+}
+
+async function fetchGroupProjects(token: string, groupPath: string) {
   const encodedGroup = encodeURIComponent(groupPath)
   const baseUrl = `https://gitlab.com/api/v4/groups/${encodedGroup}/projects?per_page=100&order_by=name&sort=asc&include_subgroups=true&archived=false`
 
   let page = 1
-  let all: { id: number; name: string; path_with_namespace: string }[] = []
+  let all: RawProject[] = []
 
   while (true) {
     const res = await fetch(`${baseUrl}&page=${page}`, {
@@ -13,9 +19,10 @@ async function fetchAllProjects(token: string, groupPath: string) {
       next: { revalidate: 300 },
     })
 
+    // Un subgrupo inexistente o vacío (ej: bcpcco aún sin repos) no debe romper el resto
     if (!res.ok) break
 
-    const data = await res.json()
+    const data: RawProject[] = await res.json()
     if (!data.length) break
 
     all = [...all, ...data]
@@ -36,14 +43,30 @@ export async function GET() {
     return NextResponse.json({ error: 'GitLab not configured' }, { status: 500 })
   }
 
-  try {
-    const data = await fetchAllProjects(token, groupPath)
+  // Subgrupos a incluir (relativos al grupo base). Si no se define, se lista el grupo completo.
+  const subgroups = (process.env.GITLAB_SUBGROUPS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
 
-    const projects = data.map(p => ({
-      id: p.id,
-      name: p.name,
-      path: p.path_with_namespace,
-    }))
+  try {
+    const groupPaths = subgroups.length > 0
+      ? subgroups.map(sub => `${groupPath}/${sub}`)
+      : [groupPath]
+
+    const results = await Promise.all(
+      groupPaths.map(path => fetchGroupProjects(token, path))
+    )
+
+    // Merge + dedupe por id (los subgrupos son hermanos, pero por las dudas)
+    const byId = new Map<number, RawProject>()
+    for (const project of results.flat()) {
+      byId.set(project.id, project)
+    }
+
+    const projects = [...byId.values()]
+      .map(p => ({ id: p.id, name: p.name, path: p.path_with_namespace }))
+      .sort((a, b) => a.name.localeCompare(b.name))
 
     return NextResponse.json(projects)
   } catch {

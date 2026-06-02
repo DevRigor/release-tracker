@@ -126,8 +126,16 @@ export default function PipelineTooltip() {
             </span>
           </div>
         ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, background: 'white', border: '1.5px solid #fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: '#f59e0b' }}>
+            ↑
+          </div>
+          <span style={{ fontSize: '11px', color: '#E8EBF2', opacity: 0.7 }}>
+            Prod desactualizado (master sin liberar)
+          </span>
+        </div>
         <p style={{ fontSize: '11px', color: '#E8EBF2', opacity: 0.7, lineHeight: 1.4, borderTop: '1px solid #2d4170', paddingTop: '8px', marginTop: '2px' }}>
-          <strong style={{ color: 'white' }}>Prod</strong>: click para registrar el ticket del deploy.
+          <strong style={{ color: 'white' }}>Prod</strong> ✓ = el código de master está en prod (mismo commit). El punto ámbar avisa que falta documentar el ticket; click para registrarlo.
         </p>
       </div>
     </div>

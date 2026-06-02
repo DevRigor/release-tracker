@@ -86,6 +86,8 @@ latamairlines/oper/flight-operation-safety-and-security/aircraft-operations
 ```env
 GITLAB_TOKEN=glpat-...
 GITLAB_GROUP_PATH=latamairlines/oper/flight-operation-safety-and-security/aircraft-operations
+# Subgrupos a trackear (relativos al grupo base, separados por coma). Vacío = grupo completo.
+GITLAB_SUBGROUPS=bcpcco,opsfle,gdh20,opltm
 
 NEXT_PUBLIC_FIREBASE_API_KEY=...
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
@@ -98,9 +100,10 @@ NEXT_PUBLIC_FIREBASE_APP_ID=...
 ### API Routes (server-side — el token nunca llega al cliente)
 
 #### `GET /api/gitlab/projects`
-- Lista todos los proyectos del grupo (con paginación automática)
+- Lista proyectos de los subgrupos definidos en `GITLAB_SUBGROUPS` (con paginación automática). Si la var está vacía, lista el grupo completo.
+- Un subgrupo inexistente o vacío (ej: `bcpcco` aún sin repos) no rompe el resto
 - Excluye proyectos archivados
-- Retorna: `{ id, name, path }[]`
+- Retorna: `{ id, name, path }[]` (dedupe por id, ordenado por nombre)
 
 #### `GET /api/gitlab/statuses?projectId=123`
 - Consulta el último deploy a cada environment via **GitLab Deployments API**
@@ -187,8 +190,17 @@ Sistema de diseño basado en los colores corporativos de LATAM Airlines:
 ### Por qué Deployments API en vez de Pipelines API
 Los pipelines de la rama `master` están dominados por scans de seguridad automáticos (`security_orchestration_policy`) que no son deploys reales. Intentamos filtrar por `source=push` y `source=web`, pero resultó complejo e impreciso. La Deployments API resuelve esto directamente — solo muestra deploys reales a environments.
 
-### Por qué el prod circle es manual (ticket)
-El pipeline de prod en GitLab es el mismo `master` con una variable `CI_TRIGGER_RELEASE=true`. No podemos leer variables de pipeline con rol Developer (requiere Maintainer). Como alternativa, el usuario registra manualmente el ticket cuando hace paso a prod — esto además sirve como documentación del deploy.
+### Detección de prod: GitLab es la fuente de verdad (no el ticket manual)
+El paso a prod se dispara corriendo el pipeline de `master` con `CI_TRIGGER_RELEASE=true`. No se puede leer esa variable con rol Developer, **pero no hace falta**: el deploy con el trigger activo aterriza en el environment `prod` de GitLab, que es perfectamente consultable vía Deployments API (verificado en vivo — ej. `co-gestion-bl` prod success en master, pipeline distinto al de intg).
+
+**"En prod" se determina comparando el SHA del deploy de prod con el de intg/master**, no solo por `prod.status === 'success'`. Razón: el environment `prod` guarda el *último* deploy exitoso, que puede ser una versión vieja mientras master tiene cambios nuevos en QA (caso real: `changemap-bff` con prod de abril y master 42 commits adelante). Estados del círculo prod:
+- `prod.sha === master.sha` (+ prod success) → verde ✓ **En prod**. Si falta el ticket, punto ámbar "falta documentar".
+- prod success pero `prod.sha !== master.sha` → ámbar ↑ **Desactualizado**: hay una versión anterior en prod y master tiene cambios sin liberar (en QA).
+- prod failed/running → ✕ rojo / ▶ azul. Sin deploy a prod → ○.
+
+El ticket manual (`lastTicketProd`) quedó como **documentación** del deploy (qué se desplegó), no como mecanismo de detección. El status que se usa es el del **deployment** (`dep.status`), no el del pipeline completo, porque es más preciso por environment. La API `statuses` retorna `{ status, webUrl, sha, deployedAt }` por environment.
+
+> Convención de environments confirmada en los subgrupos trackeados (`opsfle`, `gdh20`, `opltm`): la activa es `dev` / `intg` / `prod`. Los `development` / `staging` / `testing` / `production` que aparecen en varios repos son artefactos del scaffold (deploys viejos, sin job asociado) y se ignoran al consultar los nombres exactos.
 
 ### Cascade delete en Firestore
 Al eliminar un componente, se eliminan automáticamente sus releases asociadas para evitar datos huérfanos en la colección `releases`.
