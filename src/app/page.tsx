@@ -6,11 +6,13 @@ import { Component } from '@/lib/types'
 import SummaryPanel from '@/components/SummaryPanel'
 import ComponentsTable from '@/components/ComponentsTable'
 import AddComponentModal from '@/components/AddComponentModal'
+import HowItWorksModal from '@/components/HowItWorksModal'
 
 export default function HomePage() {
   const [components, setComponents] = useState<Component[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -35,13 +37,21 @@ export default function HomePage() {
               <p className="text-xs" style={{ color: 'var(--latam-navy-light)', opacity: 0.7 }}>dev → master → prod</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            style={{ background: 'var(--latam-red)' }}
-            className="hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-opacity flex items-center gap-2"
-          >
-            <span>+</span> Añadir Componente
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowHelp(true)}
+              className="hover:bg-white/10 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 border border-white/20"
+            >
+              <span>🧭</span> ¿Cómo funciona?
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              style={{ background: 'var(--latam-red)' }}
+              className="hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-opacity flex items-center gap-2"
+            >
+              <span>+</span> Añadir Componente
+            </button>
+          </div>
         </div>
       </header>
 
@@ -77,6 +87,8 @@ export default function HomePage() {
           onSaved={() => { setShowAdd(false); load() }}
         />
       )}
+
+      {showHelp && <HowItWorksModal onClose={() => setShowHelp(false)} />}
     </div>
   )
 }
